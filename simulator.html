@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title> Exposure Simulator (Elsir Modle)</title>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #121212;
+      color: #f0f0f0;
+    }
+
+    .mini-container {
+      max-width: 360px;
+      margin: 15px auto;
+      padding: 15px;
+      background: #1e1e1e;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    }
+
+    h2 {
+      font-size: 18px;
+      margin: 0 0 10px;
+      text-align: center;
+      color: #00c2ff;
+    }
+
+    label {
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    select, input[type="range"], input[type="file"] {
+      width: 100%;
+      margin-top: 5px;
+      background: #2a2a2a;
+      border: none;
+      border-radius: 4px;
+      padding: 5px;
+      color: #fff;
+    }
+
+    .sliders label, .edit-tools label {
+      font-size: 12px;
+    }
+
+    .sliders span {
+      float: right;
+      font-size: 12px;
+      color: #7dd3fc;
+    }
+
+    canvas {
+      display: block;
+      margin: 10px auto;
+      width: 100%;
+      height: auto;
+      border: 1px solid #555;
+      background: #000;
+      border-radius: 4px;
+    }
+
+    button {
+      width: 100%;
+      padding: 8px;
+      font-size: 14px;
+      background: #00c2ff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #009dd8;
+    }
+
+    .recommendations {
+      margin-top: 10px;
+      font-size: 12px;
+      padding: 8px;
+      background: #292929;
+      border-left: 4px solid #00c2ff;
+      border-radius: 4px;
+    }
+
+    video {
+      width: 100%;
+      margin-top: 10px;
+      border-radius: 4px;
+      display: none;
+      background: black;
+    }
+  </style>
+</head>
+<body>
+
+<div class="mini-container">
+  <h2><i class="fas fa-camera-retro"></i> Exposure Simulator (Elsir Modle)</h2>
+
+  <label><i class="fas fa-sun"></i> Light</label>
+  <select id="lighting">
+    <option value="bright">Bright</option>
+    <option value="cloudy">Cloudy</option>
+    <option value="sunset">Sunset</option>
+    <option value="indoor">Indoor</option>
+    <option value="low-light">Low Light</option>
+  </select>
+
+  <label><i class="fas fa-ruler"></i> Distance</label>
+  <select id="distance">
+    <option value="close">Close</option>
+    <option value="medium">Medium</option>
+    <option value="far">Far</option>
+  </select>
+
+  <label><i class="fas fa-running"></i> Movement</label>
+  <select id="movement">
+    <option value="still">Still</option>
+    <option value="slow">Slow</option>
+    <option value="fast">Fast</option>
+  </select>
+
+  <div class="sliders">
+    <label>Aperture: <span id="apertureValue">f/8</span></label>
+    <input type="range" id="aperture" min="1" max="22" step="0.1" value="8">
+
+    <label>Shutter: <span id="shutterValue">1s</span></label>
+    <input type="range" id="shutter" min="0.001" max="30" step="0.01" value="1">
+
+    <label>ISO: <span id="isoValue">ISO 400</span></label>
+    <input type="range" id="iso" min="100" max="12800" step="100" value="400">
+  </div>
+
+  <label><i class="fas fa-upload"></i> Upload Image</label>
+  <input type="file" id="upload" accept="image/*">
+
+  <label><i class="fas fa-video"></i> Capture from Camera</label>
+  <button id="startCamera">Start Camera</button>
+  <video id="video" autoplay playsinline></video>
+  <button id="captureImage" style="display: none;">Capture Image</button>
+
+  <label>Brightness</label>
+  <input type="range" id="customBrightness" min="0.1" max="2" step="0.1" value="1">
+
+  <label>Blur</label>
+  <input type="range" id="customBlur" min="0" max="10" step="0.5" value="0">
+
+  <canvas id="previewCanvas" width="300" height="200"></canvas>
+
+  <button id="submit"><i class="fas fa-magic"></i> Apply</button>
+  <button id="reset"><i class="fas fa-sync-alt"></i> Reset</button>
+
+  <div class="recommendations">
+    <strong>Tip:</strong>
+    <p id="advice">Adjust sliders to get suggestions.</p>
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const aperture = document.getElementById("aperture");
+  const shutter = document.getElementById("shutter");
+  const iso = document.getElementById("iso");
+  const advice = document.getElementById("advice");
+  const canvas = document.getElementById("previewCanvas");
+  const ctx = canvas.getContext("2d");
+  const apertureValue = document.getElementById("apertureValue");
+  const shutterValue = document.getElementById("shutterValue");
+  const isoValue = document.getElementById("isoValue");
+  const uploadInput = document.getElementById("upload");
+  const customBrightness = document.getElementById("customBrightness");
+  const customBlur = document.getElementById("customBlur");
+  const submitButton = document.getElementById("submit");
+  const resetButton = document.getElementById("reset");
+  const video = document.getElementById("video");
+  const startCameraBtn = document.getElementById("startCamera");
+  const captureBtn = document.getElementById("captureImage");
+
+  let uploadedImage = null;
+  let cameraStream = null;
+
+  function updateAdvice() {
+    apertureValue.textContent = `f/${aperture.value}`;
+    shutterValue.textContent = `${parseFloat(shutter.value).toFixed(2)}s`;
+    isoValue.textContent = `ISO ${iso.value}`;
+
+    let text = "";
+
+    if (aperture.value < 4) text += "Good for portraits. ";
+    if (aperture.value > 16) text += "Ideal for landscapes. ";
+    if (shutter.value < 0.01) text += "Freezes motion. ";
+    if (shutter.value > 1) text += "Use tripod. ";
+    if (iso.value > 3200) text += "Watch for noise. ";
+
+    advice.textContent = text || "Balanced exposure.";
+    updatePreview();
+  }
+
+  function updatePreview() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.filter = `brightness(${customBrightness.value}) blur(${customBlur.value}px)`;
+    if (uploadedImage) {
+      ctx.drawImage(uploadedImage, 0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.fillStyle = `rgb(${255 - iso.value / 64}, ${200 - iso.value / 80}, 150)`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+  }
+
+  function loadImage(file) {
+    const reader = new FileReader();
+    const img = new Image();
+    reader.onload = function (e) {
+      img.src = e.target.result;
+      img.onload = function () {
+        uploadedImage = img;
+        updatePreview();
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  uploadInput.addEventListener("change", () => {
+    const file = uploadInput.files[0];
+    if (file) loadImage(file);
+  });
+
+  startCameraBtn.addEventListener("click", async () => {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = cameraStream;
+      video.style.display = "block";
+      captureBtn.style.display = "inline-block";
+      startCameraBtn.style.display = "none";
+    } catch (error) {
+      alert("Camera access denied or unavailable.");
+    }
+  });
+
+  captureBtn.addEventListener("click", () => {
+    ctx.filter = `brightness(${customBrightness.value}) blur(${customBlur.value}px)`;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    const dataURL = canvas.toDataURL();
+    const img = new Image();
+    img.onload = () => {
+      uploadedImage = img;
+      updatePreview();
+    };
+    img.src = dataURL;
+
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      video.style.display = "none";
+      captureBtn.style.display = "none";
+      startCameraBtn.style.display = "inline-block";
+    }
+  });
+
+  [aperture, shutter, iso, customBrightness, customBlur].forEach(input => {
+    input.addEventListener("input", updateAdvice);
+  });
+
+  submitButton.addEventListener("click", updateAdvice);
+
+  resetButton.addEventListener("click", () => {
+    uploadedImage = null;
+    customBrightness.value = 1;
+    customBlur.value = 0;
+    updatePreview();
+  });
+
+  updateAdvice();
+});
+</script>
+</body>
+</html>
